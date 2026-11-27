@@ -23,25 +23,6 @@ const hasSpeechRecognition =
   typeof window !== 'undefined' &&
   Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
 
-const pickIndianFemaleVoice = () => {
-  if (!hasSpeechSynthesis) return null;
-  const voices = window.speechSynthesis.getVoices() || [];
-  const indianVoices = voices.filter((v) => {
-    const lang = (v.lang || "").toLowerCase().replace("_", "-");
-    const name = (v.name || "").toLowerCase();
-    return lang.startsWith("en-in") || (lang.startsWith("en") && name.includes("india"));
-  });
-  const femaleRegex = /\b(neerja|heera|veena|isha|sangeeta|ananya|kavya|priya|female|woman)\b|en-in-x-(ena|enc|ene)/i;
-  const maleRegex = /\b(rishi|ravi|prabhat|male|man)\b/i;
-  return (
-    indianVoices.find((v) => femaleRegex.test(v.name) && !maleRegex.test(v.name)) ||
-    indianVoices.find((v) => !maleRegex.test(v.name)) ||
-    indianVoices[0] ||
-    voices.find((v) => (v.lang || "").toLowerCase().startsWith("en") && /\b(samantha|zira|victoria|karen|female|woman)\b/i.test(v.name)) ||
-    null
-  );
-};
-
 export default function ResultsView({ data, apiBase, sessionId, onDocumentUpdate }) {
   const [copiedType, setCopiedType] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -53,15 +34,6 @@ export default function ResultsView({ data, apiBase, sessionId, onDocumentUpdate
   const transcriptRef = useRef('');
 
   const { _id, result, fileName, mode, ocrUsed, qaHistory = [] } = data || {};
-
-  // Preload browser speech voices (needed on Chrome/Safari)
-  useEffect(() => {
-    if (!hasSpeechSynthesis) return;
-    window.speechSynthesis.getVoices();
-    const onVoicesChanged = () => window.speechSynthesis.getVoices();
-    window.speechSynthesis.addEventListener?.("voiceschanged", onVoicesChanged);
-    return () => window.speechSynthesis.removeEventListener?.("voiceschanged", onVoicesChanged);
-  }, []);
 
   // Stop speech when switching documents or unmounting
   useEffect(() => {
@@ -114,10 +86,6 @@ export default function ResultsView({ data, apiBase, sessionId, onDocumentUpdate
       result.keyPoints?.length ? 'Key points: ' + result.keyPoints.join('. ') : '',
     ].filter(Boolean);
     const utterance = new SpeechSynthesisUtterance(parts.join('. '));
-    utterance.lang = 'en-IN';
-    utterance.rate = 0.98;
-    const preferredVoice = pickIndianFemaleVoice();
-    if (preferredVoice) utterance.voice = preferredVoice;
     utterance.onend = () => setIsSpeaking(false);
     utterance.onerror = () => setIsSpeaking(false);
     setIsSpeaking(true);
