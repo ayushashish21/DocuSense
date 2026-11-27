@@ -4,7 +4,7 @@ import Navbar from './components/Navbar';
 import UploadZone from './components/UploadZone';
 import ResultsView from './components/ResultsView';
 
-const API_BASE = 'http://localhost:5001/api';
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
 
 const MODES = [
   { id: 'summarize', label: 'Summarize' },
