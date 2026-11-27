@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, AlertCircle, Clock, Trash2, Sparkles, X, Mic, Square } from 'lucide-react';
+import {
+  Loader2,
+  AlertCircle,
+  Clock,
+  Trash2,
+  Sparkles,
+  X,
+  Mic,
+  Square,
+  Search,
+} from 'lucide-react';
 import Navbar from './components/Navbar';
 import UploadZone from './components/UploadZone';
 import ResultsView from './components/ResultsView';
@@ -7,15 +17,23 @@ import Footer from './components/Footer';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
+const hasSpeechRecognition =
+  typeof window !== 'undefined' &&
+  Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+
 const getSessionId = () => {
-  let id = localStorage.getItem('docusense_session_id');
-  if (!id) {
-    id = crypto.randomUUID
-      ? crypto.randomUUID()
-      : Date.now() + '-' + Math.random().toString(36).slice(2);
-    localStorage.setItem('docusense_session_id', id);
+  try {
+    let id = localStorage.getItem('docusense_session_id');
+    if (!id) {
+      id = crypto.randomUUID
+        ? crypto.randomUUID()
+        : Date.now() + '-' + Math.random().toString(36).slice(2);
+      localStorage.setItem('docusense_session_id', id);
+    }
+    return id;
+  } catch {
+    return Date.now() + '-' + Math.random().toString(36).slice(2);
   }
-  return id;
 };
 const SESSION_ID = getSessionId();
 
@@ -37,6 +55,7 @@ export default function App() {
   const [error, setError] = useState('');
   const [currentResult, setCurrentResult] = useState(null);
   const [history, setHistory] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const recognitionRef = useRef(null);
   const transcriptRef = useRef('');
@@ -105,16 +124,20 @@ export default function App() {
     }
   };
 
+  const handleDocumentUpdate = (updatedDoc) => {
+    setCurrentResult(updatedDoc);
+    setHistory((prev) =>
+      prev.map((item) => (item._id === updatedDoc._id ? updatedDoc : item))
+    );
+  };
+
   const toggleVoiceInput = () => {
+    if (!hasSpeechRecognition) return;
     if (isListening) {
       recognitionRef.current?.stop();
       return;
     }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setError('Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.');
-      return;
-    }
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
     recognition.interimResults = true;
@@ -175,22 +198,34 @@ export default function App() {
       if (res.ok) {
         setHistory([]);
         setCurrentResult(null);
+        setSearchQuery('');
       }
     } catch (err) {
       console.error('Failed to clear history:', err);
     }
   };
 
+  const filteredHistory = history.filter((item) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    const title = (item.result?.title || '').toLowerCase();
+    const name = (item.fileName || '').toLowerCase();
+    const m = (item.mode || '').toLowerCase();
+    return title.includes(q) || name.includes(q) || m.includes(q);
+  });
+
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50 text-gray-900 antialiased selection:bg-indigo-100 selection:text-indigo-900">
-      <Navbar onNewDocument={handleReset} />
+    <div className="flex min-h-dvh flex-col bg-gray-50 text-gray-900 antialiased selection:bg-indigo-100 selection:text-indigo-900">
+      <div className="no-print">
+        <Navbar onNewDocument={handleReset} />
+      </div>
 
       <main
         id="workspace"
         className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12 2xl:max-w-[1440px]"
       >
         {/* Hero Header */}
-        <section className="mx-auto max-w-3xl text-center">
+        <section className="no-print mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3.5 py-1 text-xs font-medium text-gray-600 shadow-2xs transition-all duration-200 hover:border-indigo-200 hover:shadow-xs">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-75" />
@@ -207,8 +242,8 @@ export default function App() {
           </h1>
 
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-gray-500 sm:mt-4 sm:text-base lg:text-lg">
-            Upload contracts, invoices, or reports to generate executive summaries,
-            actionable bullet points, and structured entity extractions in seconds.
+            Upload contracts, invoices, or scanned PDFs to generate summaries,
+            actionable bullets, entity extractions, and follow-up answers in seconds.
           </p>
         </section>
 
@@ -216,7 +251,7 @@ export default function App() {
         <div className="mt-8 grid grid-cols-1 items-start gap-6 sm:mt-10 lg:grid-cols-12 xl:gap-8">
           {/* Left Column: Upload & Results */}
           <div className="space-y-6 lg:col-span-8">
-            <section className="space-y-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-2xs transition-all duration-200 hover:border-gray-300/80 hover:shadow-md sm:p-6">
+            <section className="no-print space-y-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-2xs transition-all duration-200 hover:border-gray-300/80 hover:shadow-md sm:p-6">
               {/* Mode Selector */}
               <div>
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
@@ -265,26 +300,34 @@ export default function App() {
                       }}
                       disabled={loading}
                       maxLength={500}
-                      placeholder="e.g. What is the cancellation notice period? or tap the mic to speak"
-                      className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/50 py-2.5 pl-3.5 pr-12 text-sm text-gray-900 transition-all duration-200 placeholder:text-gray-400 hover:border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:outline-none disabled:opacity-60"
-                    />
-                    <button
-                      type="button"
-                      onClick={toggleVoiceInput}
-                      disabled={loading}
-                      title={isListening ? 'Stop & Analyze' : 'Ask with voice'}
-                      className={`absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 disabled:opacity-50 ${
-                        isListening
-                          ? 'animate-pulse bg-red-600 text-white shadow-sm hover:bg-red-700'
-                          : 'bg-white text-gray-600 ring-1 ring-gray-200 hover:scale-105 hover:bg-indigo-50 hover:text-indigo-600 hover:ring-indigo-200'
+                      placeholder={
+                        hasSpeechRecognition
+                          ? 'e.g. What is the cancellation notice period? or tap the mic to speak'
+                          : 'e.g. What is the cancellation notice period?'
+                      }
+                      className={`w-full resize-none rounded-xl border border-gray-200 bg-gray-50/50 py-2.5 pl-3.5 text-base text-gray-900 transition-all duration-200 placeholder:text-gray-400 hover:border-gray-300 focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:outline-none disabled:opacity-60 sm:text-sm ${
+                        hasSpeechRecognition ? 'pr-12' : 'pr-3.5'
                       }`}
-                    >
-                      {isListening ? (
-                        <Square className="h-3.5 w-3.5 fill-current" />
-                      ) : (
-                        <Mic className="h-4 w-4" />
-                      )}
-                    </button>
+                    />
+                    {hasSpeechRecognition && (
+                      <button
+                        type="button"
+                        onClick={toggleVoiceInput}
+                        disabled={loading}
+                        title={isListening ? 'Stop & Analyze' : 'Ask with voice'}
+                        className={`absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-200 disabled:opacity-50 ${
+                          isListening
+                            ? 'animate-pulse bg-red-600 text-white shadow-sm hover:bg-red-700'
+                            : 'bg-white text-gray-600 ring-1 ring-gray-200 hover:scale-105 hover:bg-indigo-50 hover:text-indigo-600 hover:ring-indigo-200'
+                        }`}
+                      >
+                        {isListening ? (
+                          <Square className="h-3.5 w-3.5 fill-current" />
+                        ) : (
+                          <Mic className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -318,7 +361,7 @@ export default function App() {
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Extracting text & analyzing...</span>
+                    <span>Reading PDF & analyzing with Gemini...</span>
                   </>
                 ) : (
                   <>
@@ -330,13 +373,20 @@ export default function App() {
             </section>
 
             {/* AI Results */}
-            {currentResult && <ResultsView data={currentResult} />}
+            {currentResult && (
+              <ResultsView
+                data={currentResult}
+                apiBase={API_BASE}
+                sessionId={SESSION_ID}
+                onDocumentUpdate={handleDocumentUpdate}
+              />
+            )}
           </div>
 
           {/* Right Column: Recent History */}
-          <aside id="history" className="lg:sticky lg:top-24 lg:col-span-4">
+          <aside id="history" className="no-print lg:sticky lg:top-24 lg:col-span-4">
             <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-2xs transition-all duration-200 hover:border-gray-300/80 hover:shadow-md sm:p-5">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-400">
                   <Clock className="h-3.5 w-3.5" />
                   <span>Recent Documents</span>
@@ -353,6 +403,20 @@ export default function App() {
                 )}
               </div>
 
+              {/* Search History */}
+              {history.length > 0 && (
+                <div className="relative mb-3">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Filter history..."
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50/60 py-1.5 pl-8 pr-3 text-base text-gray-900 transition placeholder:text-gray-400 focus:border-indigo-500 focus:bg-white focus:outline-none sm:text-xs"
+                  />
+                </div>
+              )}
+
               {loadingHistory ? (
                 <div className="flex justify-center py-6">
                   <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
@@ -361,9 +425,13 @@ export default function App() {
                 <p className="py-6 text-center text-xs text-gray-400">
                   Analyzed PDFs will appear here and stay saved in MongoDB.
                 </p>
+              ) : filteredHistory.length === 0 ? (
+                <p className="py-6 text-center text-xs text-gray-400">
+                  No matching documents found.
+                </p>
               ) : (
                 <ul className="max-h-[420px] space-y-2 overflow-y-auto pr-0.5">
-                  {history.map((item) => (
+                  {filteredHistory.map((item) => (
                     <li key={item._id}>
                       <div
                         role="button"
@@ -402,23 +470,23 @@ export default function App() {
         </div>
 
         {/* How It Works Strip */}
-        <section id="how-it-works" className="mt-14 border-t border-gray-200 pt-10 sm:mt-16">
+        <section id="how-it-works" className="no-print mt-14 border-t border-gray-200 pt-10 sm:mt-16">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
             {[
               {
                 step: '01',
                 title: 'Upload any PDF',
-                desc: 'Drag and drop contracts, invoices, or study notes up to 10MB.',
+                desc: 'Drop text-based or scanned PDFs up to 10MB from any device or OS.',
               },
               {
                 step: '02',
-                title: 'Pick a workflow mode',
-                desc: 'Summarize, extract entities, draft emails, or ask anything by typing or voice.',
+                title: 'Analyze & ask follow-ups',
+                desc: 'Summarize, extract entities, draft emails, or ask follow-up questions by text or voice.',
               },
               {
                 step: '03',
-                title: 'Export clean insights',
-                desc: 'Review structured cards and copy plain summaries or raw JSON with one click.',
+                title: 'Listen or export reports',
+                desc: 'Hear summaries read aloud, copy JSON, download Markdown, or save a clean PDF.',
               },
             ].map((item) => (
               <div
@@ -436,7 +504,9 @@ export default function App() {
         </section>
       </main>
 
-      <Footer onSelectMode={setMode} onNewDocument={handleReset} />
+      <div className="no-print">
+        <Footer onSelectMode={setMode} onNewDocument={handleReset} />
+      </div>
     </div>
   );
 }

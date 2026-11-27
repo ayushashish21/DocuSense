@@ -4,11 +4,23 @@ import { Upload, FileText, X } from 'lucide-react';
 export default function UploadZone({ file, onFileSelect, onClear, disabled }) {
   const inputRef = useRef(null);
   const [dragging, setDragging] = useState(false);
+  const [fileError, setFileError] = useState('');
 
   const handleFiles = (files) => {
     const selected = files?.[0];
     if (!selected) return;
-    if (selected.type !== 'application/pdf') return;
+    const isPdf =
+      selected.type === 'application/pdf' ||
+      selected.name?.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setFileError('Please select a valid PDF file (.pdf).');
+      return;
+    }
+    if (selected.size > 10 * 1024 * 1024) {
+      setFileError('File exceeds the 10MB limit.');
+      return;
+    }
+    setFileError('');
     onFileSelect(selected);
   };
 
@@ -43,48 +55,55 @@ export default function UploadZone({ file, onFileSelect, onClear, disabled }) {
   }
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={() => !disabled && inputRef.current?.click()}
-      onKeyDown={(e) => !disabled && e.key === 'Enter' && inputRef.current?.click()}
-      onDragOver={(e) => {
-        e.preventDefault();
-        if (!disabled) setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragging(false);
-        if (!disabled) handleFiles(e.dataTransfer.files);
-      }}
-      className={`group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-all duration-200 sm:px-6 sm:py-10 ${
-        dragging
-          ? 'scale-[1.01] border-indigo-500 bg-indigo-50/50'
-          : 'border-gray-200 bg-gray-50/40 hover:border-indigo-300 hover:bg-indigo-50/20'
-      } ${disabled ? 'pointer-events-none opacity-60' : ''}`}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf"
-        className="hidden"
-        disabled={disabled}
-        onChange={(e) => {
-          handleFiles(e.target.files);
-          e.target.value = '';
+    <div>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => !disabled && inputRef.current?.click()}
+        onKeyDown={(e) => !disabled && e.key === 'Enter' && inputRef.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled) setDragging(true);
         }}
-      />
-      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-gray-600 shadow-2xs ring-1 ring-gray-200 transition-all duration-200 group-hover:-translate-y-1 group-hover:text-indigo-600 group-hover:ring-indigo-200 group-hover:shadow-sm">
-        <Upload className="h-5 w-5" />
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          if (!disabled) handleFiles(e.dataTransfer.files);
+        }}
+        className={`group flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-4 py-8 text-center transition-all duration-200 sm:px-6 sm:py-10 ${
+          dragging
+            ? 'scale-[1.01] border-indigo-500 bg-indigo-50/50'
+            : 'border-gray-200 bg-gray-50/40 hover:border-indigo-300 hover:bg-indigo-50/20'
+        } ${disabled ? 'pointer-events-none opacity-60' : ''}`}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf,application/pdf"
+          className="hidden"
+          disabled={disabled}
+          onChange={(e) => {
+            handleFiles(e.target.files);
+            e.target.value = '';
+          }}
+        />
+        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-gray-600 shadow-2xs ring-1 ring-gray-200 transition-all duration-200 group-hover:-translate-y-1 group-hover:text-indigo-600 group-hover:ring-indigo-200 group-hover:shadow-sm">
+          <Upload className="h-5 w-5" />
+        </div>
+        <p className="mt-3 text-sm font-medium text-gray-800">
+          Drop your PDF here, or{' '}
+          <span className="text-indigo-600 underline decoration-indigo-300 underline-offset-4 transition group-hover:decoration-indigo-600">
+            browse
+          </span>
+        </p>
+        <p className="mt-1 text-xs text-gray-500">
+          Supports text & scanned PDFs up to 10MB
+        </p>
       </div>
-      <p className="mt-3 text-sm font-medium text-gray-800">
-        Drop your PDF here, or{' '}
-        <span className="text-indigo-600 underline decoration-indigo-300 underline-offset-4 transition group-hover:decoration-indigo-600">
-          browse
-        </span>
-      </p>
-      <p className="mt-1 text-xs text-gray-500">Supports text-based PDFs up to 10MB</p>
+      {fileError && (
+        <p className="mt-2 text-center text-xs font-medium text-red-600">{fileError}</p>
+      )}
     </div>
   );
 }

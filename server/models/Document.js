@@ -8,6 +8,15 @@ const entitySchema = new mongoose.Schema(
   { _id: false }
 );
 
+const qaSchema = new mongoose.Schema(
+  {
+    question: { type: String, required: true },
+    answer: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const documentSchema = new mongoose.Schema(
   {
     sessionId: { type: String, required: true, index: true },
@@ -18,12 +27,15 @@ const documentSchema = new mongoose.Schema(
       enum: ['summarize', 'extract', 'bullets', 'email', 'custom'],
       default: 'summarize',
     },
+    ocrUsed: { type: Boolean, default: false },
+    extractedText: { type: String, default: '' },
     result: {
       title: { type: String, required: true },
       summary: { type: String, required: true },
       keyPoints: [{ type: String }],
       entities: [entitySchema],
     },
+    qaHistory: [qaSchema],
   },
   { timestamps: true }
 );
