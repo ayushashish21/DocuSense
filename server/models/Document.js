@@ -15,7 +15,7 @@ const documentSchema = new mongoose.Schema(
     fileSize: { type: Number, required: true },
     mode: {
       type: String,
-      enum: ['summarize', 'extract', 'bullets'],
+      enum: ['summarize', 'extract', 'bullets', 'email', 'custom'],
       default: 'summarize',
     },
     result: {

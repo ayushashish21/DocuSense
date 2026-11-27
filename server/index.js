@@ -67,6 +67,10 @@ const MODE_INSTRUCTIONS = {
     'Focus heavily on extracting key entities (names, organizations, dates, monetary values, obligations, IDs) into the entities array, alongside a brief overview.',
   bullets:
     'Convert the document into crisp, actionable bullet points in keyPoints with a brief executive summary.',
+  email:
+    'Draft a professional, ready-to-send follow-up or executive update email based on the document. Put the full email body (including greeting and sign-off) in summary, put the suggested Subject line and next steps in keyPoints, and extract recipients, dates, or action owners in entities.',
+  custom:
+    'Answer the user request based on the document.',
 };
 
 // Health check
@@ -111,7 +115,14 @@ app.post('/api/analyze', analyzeLimiter, upload.single('file'), async (req, res)
     const mode = Object.keys(MODE_INSTRUCTIONS).includes(req.body.mode)
       ? req.body.mode
       : 'summarize';
-    const modeInstruction = MODE_INSTRUCTIONS[mode];
+    const customPrompt = req.body.customPrompt?.trim().slice(0, 500) || '';
+    if (mode === 'custom' && !customPrompt) {
+      return res.status(400).json({ error: 'Please enter a custom prompt or question.' });
+    }
+    const modeInstruction =
+      mode === 'custom'
+        ? `Fulfill this specific user request based strictly on the document: "${customPrompt}". Put the main answer in summary, supporting points in keyPoints, and relevant facts in entities.`
+        : MODE_INSTRUCTIONS[mode];
 
     // 1. Extract text from PDF
     console.log('[2] Extracting text from PDF...');

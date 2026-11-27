@@ -20,11 +20,14 @@ const MODES = [
   { id: 'summarize', label: 'Summarize' },
   { id: 'extract', label: 'Extract Entities' },
   { id: 'bullets', label: 'Actionable Bullets' },
+  { id: 'email', label: 'Draft Email' },
+  { id: 'custom', label: 'Ask PDF' },
 ];
 
 export default function App() {
   const [file, setFile] = useState(null);
   const [mode, setMode] = useState('summarize');
+  const [customPrompt, setCustomPrompt] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [error, setError] = useState('');
@@ -65,6 +68,7 @@ export default function App() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('mode', mode);
+      if (mode === 'custom') formData.append('customPrompt', customPrompt.trim());
 
       const res = await fetch(`${API_BASE}/analyze`, {
         method: 'POST',
@@ -152,7 +156,7 @@ export default function App() {
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-gray-400">
                   Workflow Mode
                 </label>
-                <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-gray-100 p-1">
+                <div className="grid grid-cols-2 gap-1.5 rounded-xl bg-gray-100 p-1 sm:grid-cols-5">
                   {MODES.map((m) => (
                     <button
                       key={m.id}
@@ -170,6 +174,26 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {mode === 'custom' && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
+                    Your Question / Prompt
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={customPrompt}
+                    onChange={(e) => {
+                      setCustomPrompt(e.target.value);
+                      setError('');
+                    }}
+                    disabled={loading}
+                    maxLength={500}
+                    placeholder="e.g. What is the cancellation notice period? or Translate the summary to Hindi"
+                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-900 focus:bg-white focus:outline-none disabled:opacity-60"
+                  />
+                </div>
+              )}
 
               {/* Drag & Drop PDF Upload */}
               <UploadZone
@@ -194,7 +218,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleAnalyze}
-                disabled={!file || loading}
+                disabled={!file || loading || (mode === 'custom' && !customPrompt.trim())}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-gray-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-gray-300"
               >
                 {loading ? (
