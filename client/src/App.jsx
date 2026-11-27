@@ -3,6 +3,7 @@ import { Loader2, AlertCircle, Clock, Trash2, Sparkles, X, Mic, Square } from 'l
 import Navbar from './components/Navbar';
 import UploadZone from './components/UploadZone';
 import ResultsView from './components/ResultsView';
+import Footer from './components/Footer';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -435,13 +436,7 @@ export default function App() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="mt-14 border-t border-gray-200 bg-white py-6 sm:mt-16">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-2 px-4 text-center text-xs text-gray-500 sm:flex-row sm:px-6 sm:text-left lg:px-8 2xl:max-w-[1440px]">
-          <span>© {new Date().getFullYear()} DocuSense</span>
-          <span>Built with React, Express, MongoDB & Gemini API</span>
-        </div>
-      </footer>
+      <Footer onSelectMode={setMode} onNewDocument={handleReset} />
     </div>
   );
 }
