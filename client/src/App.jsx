@@ -6,6 +6,16 @@ import ResultsView from './components/ResultsView';
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5001/api";
 
+const getSessionId = () => {
+  let id = localStorage.getItem('docusense_session_id');
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : Date.now() + "-" + Math.random().toString(36).slice(2);
+    localStorage.setItem('docusense_session_id', id);
+  }
+  return id;
+};
+const SESSION_ID = getSessionId();
+
 const MODES = [
   { id: 'summarize', label: 'Summarize' },
   { id: 'extract', label: 'Extract Entities' },
@@ -25,7 +35,7 @@ export default function App() {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${API_BASE}/documents`);
+        const res = await fetch(`${API_BASE}/documents`, { headers: { 'x-session-id': SESSION_ID } });
         if (res.ok) {
           const data = await res.json();
           setHistory(data);
@@ -58,6 +68,7 @@ export default function App() {
 
       const res = await fetch(`${API_BASE}/analyze`, {
         method: 'POST',
+        headers: { 'x-session-id': SESSION_ID },
         body: formData,
       });
 
@@ -80,7 +91,7 @@ export default function App() {
   const handleDeleteOne = async (e, id) => {
     e.stopPropagation();
     try {
-      const res = await fetch(`${API_BASE}/documents/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/documents/${id}`, { method: 'DELETE', headers: { 'x-session-id': SESSION_ID } });
       if (res.ok) {
         setHistory((prev) => prev.filter((item) => item._id !== id));
         if (currentResult?._id === id) setCurrentResult(null);
@@ -92,7 +103,7 @@ export default function App() {
 
   const handleClearAll = async () => {
     try {
-      const res = await fetch(`${API_BASE}/documents`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/documents`, { method: 'DELETE', headers: { 'x-session-id': SESSION_ID } });
       if (res.ok) {
         setHistory([]);
         setCurrentResult(null);

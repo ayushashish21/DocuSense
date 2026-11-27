@@ -10,6 +10,7 @@ const entitySchema = new mongoose.Schema(
 
 const documentSchema = new mongoose.Schema(
   {
+    sessionId: { type: String, required: true, index: true },
     fileName: { type: String, required: true },
     fileSize: { type: Number, required: true },
     mode: {

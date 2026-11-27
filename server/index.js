@@ -22,6 +22,7 @@ app.use(
   cors({
     origin: CLIENT_URL,
     methods: ['GET', 'POST', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'x-session-id'],
   })
 );
 app.use(express.json({ limit: '1mb' }));
@@ -76,10 +77,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+const getSessionId = (req) => req.headers['x-session-id']?.trim();
+
 // Get recent analyzed documents
 app.get('/api/documents', async (req, res) => {
   try {
-    const docs = await Document.find().sort({ createdAt: -1 }).limit(20);
+    const sessionId = getSessionId(req);
+    if (!sessionId) return res.json([]);
+    const docs = await Document.find({ sessionId }).sort({ createdAt: -1 }).limit(20);
     res.json(docs);
   } catch (error) {
     console.error('Fetch documents error:', error);
@@ -92,6 +97,9 @@ app.post('/api/analyze', analyzeLimiter, upload.single('file'), async (req, res)
   console.log('\n[1] Request received:', req.file?.originalname, '| mode:', req.body.mode);
 
   try {
+    const sessionId = getSessionId(req);
+    if (!sessionId) return res.status(400).json({ error: 'Missing session ID.' });
+
     if (!req.file) {
       return res.status(400).json({ error: 'Please upload a PDF file.' });
     }
@@ -175,6 +183,7 @@ ${extractedText.slice(0, 30000)}
 
     // 3. Save to MongoDB
     const savedDoc = await Document.create({
+      sessionId,
       fileName: req.file.originalname,
       fileSize: req.file.size,
       mode,
@@ -199,10 +208,12 @@ ${extractedText.slice(0, 30000)}
 // Delete a single document (with ObjectId validation)
 app.delete('/api/documents/:id', async (req, res) => {
   try {
+    const sessionId = getSessionId(req);
+    if (!sessionId) return res.status(400).json({ error: 'Missing session ID.' });
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Invalid document ID.' });
     }
-    const deleted = await Document.findByIdAndDelete(req.params.id);
+    const deleted = await Document.findOneAndDelete({ _id: req.params.id, sessionId });
     if (!deleted) {
       return res.status(404).json({ error: 'Document not found.' });
     }
@@ -215,7 +226,9 @@ app.delete('/api/documents/:id', async (req, res) => {
 // Clear all documents
 app.delete('/api/documents', async (req, res) => {
   try {
-    await Document.deleteMany({});
+    const sessionId = getSessionId(req);
+    if (!sessionId) return res.status(400).json({ error: 'Missing session ID.' });
+    await Document.deleteMany({ sessionId });
     res.json({ message: 'All documents cleared' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to clear documents.' });
