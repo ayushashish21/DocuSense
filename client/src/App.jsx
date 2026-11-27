@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, Clock, Trash2, Sparkles, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Loader2, AlertCircle, Clock, Trash2, Sparkles, X, Mic, Square } from 'lucide-react';
 import Navbar from './components/Navbar';
 import UploadZone from './components/UploadZone';
 import ResultsView from './components/ResultsView';
@@ -28,6 +28,11 @@ export default function App() {
   const [file, setFile] = useState(null);
   const [mode, setMode] = useState('summarize');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+  const transcriptRef = useRef('');
+  const fileRef = useRef(file);
+  fileRef.current = file;
   const [loading, setLoading] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [error, setError] = useState('');
@@ -59,16 +64,18 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleAnalyze = async () => {
-    if (!file) return;
+  const handleAnalyze = async (promptOverride) => {
+    const activeFile = fileRef.current;
+    const activePrompt = typeof promptOverride === 'string' ? promptOverride : customPrompt;
+    if (!activeFile) return;
     setLoading(true);
     setError('');
 
     try {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', activeFile);
       formData.append('mode', mode);
-      if (mode === 'custom') formData.append('customPrompt', customPrompt.trim());
+      if (mode === 'custom') formData.append('customPrompt', activePrompt.trim());
 
       const res = await fetch(`${API_BASE}/analyze`, {
         method: 'POST',
@@ -90,6 +97,47 @@ export default function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const toggleVoiceInput = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError('Voice input is not supported in this browser. Please use Chrome, Edge, or Safari.');
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    transcriptRef.current = '';
+    recognition.onstart = () => {
+      setIsListening(true);
+      setError('');
+    };
+    recognition.onresult = (event) => {
+      const text = Array.from(event.results).map((r) => r[0].transcript).join('');
+      transcriptRef.current = text;
+      setCustomPrompt(text);
+    };
+    recognition.onerror = (event) => {
+      if (event.error !== 'no-speech' && event.error !== 'aborted') {
+        setError('Voice input error: ' + event.error);
+      }
+      setIsListening(false);
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+      const finalPrompt = transcriptRef.current.trim();
+      if (finalPrompt && fileRef.current) {
+        handleAnalyze(finalPrompt);
+      }
+    };
+    recognitionRef.current = recognition;
+    recognition.start();
   };
 
   const handleDeleteOne = async (e, id) => {
@@ -177,9 +225,18 @@ export default function App() {
 
               {mode === 'custom' && (
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                    Your Question / Prompt
-                  </label>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400">
+                      Your Question / Prompt
+                    </label>
+                    {isListening && (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600">
+                        <span className="h-2 w-2 animate-ping rounded-full bg-red-500" />
+                        Listening... speak now
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
                   <textarea
                     rows={2}
                     value={customPrompt}
@@ -190,8 +247,18 @@ export default function App() {
                     disabled={loading}
                     maxLength={500}
                     placeholder="e.g. What is the cancellation notice period? or Translate the summary to Hindi"
-                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-900 focus:bg-white focus:outline-none disabled:opacity-60"
+                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50/50 py-2.5 pl-3.5 pr-12 text-sm text-gray-900 placeholder:text-gray-400 focus:border-gray-900 focus:bg-white focus:outline-none disabled:opacity-60"
                   />
+                  <button
+                    type="button"
+                    onClick={toggleVoiceInput}
+                    disabled={loading}
+                    title={isListening ? "Stop & Analyze" : "Ask with voice"}
+                    className={`absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-lg transition disabled:opacity-50 ${isListening ? "animate-pulse bg-red-600 text-white hover:bg-red-700" : "bg-white text-gray-600 ring-1 ring-gray-200 hover:bg-gray-100 hover:text-gray-900"}`}
+                  >
+                    {isListening ? <Square className="h-3.5 w-3.5 fill-current" /> : <Mic className="h-4 w-4" />}
+                  </button>
+                  </div>
                 </div>
               )}
 
